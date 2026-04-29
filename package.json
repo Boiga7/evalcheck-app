@@ -1,0 +1,22 @@
+{
+  "name": "evalcheck-app",
+  "version": "0.0.1",
+  "description": "GitHub App that posts PR comments for evalcheck eval regressions.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.17",
+    "@vercel/node": "^3.2.29",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.9"
+  },
+  "dependencies": {
+    "jose": "^5.10.0",
+    "jszip": "^3.10.1"
+  }
+}
