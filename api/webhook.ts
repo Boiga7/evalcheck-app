@@ -43,10 +43,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    await handleWorkflowRun(payload, {
-      appId,
-      privateKey: privateKey.replace(/\\n/g, "\n"),
-    });
+    await handleWorkflowRun(payload, { appId, privateKey });
     return res.status(200).json({ ok: true });
   } catch (err) {
     console.error("orchestrator failed", err);

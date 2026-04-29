@@ -2,8 +2,15 @@ import { SignJWT, importPKCS8 } from "jose";
 
 const TEN_MINUTES = 60 * 10;
 
+function normalizePem(pem: string): string {
+  return pem
+    .replace(/\\n/g, "\n")
+    .replace(/\r\n?/g, "\n")
+    .trim();
+}
+
 export async function mintAppJwt(appId: string, privateKeyPem: string): Promise<string> {
-  const key = await importPKCS8(privateKeyPem, "RS256");
+  const key = await importPKCS8(normalizePem(privateKeyPem), "RS256");
   const now = Math.floor(Date.now() / 1000);
   return await new SignJWT({})
     .setProtectedHeader({ alg: "RS256" })
