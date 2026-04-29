@@ -87,15 +87,28 @@ export async function downloadArtifactJson(
   repo: string,
   artifactId: number,
   filename: string,
-): Promise<string | null> {
+): Promise<{ content: string | null; available: string[] }> {
   const url = `https://api.github.com/repos/${owner}/${repo}/actions/artifacts/${artifactId}/zip`;
   const res = await fetch(url, { headers: headers(token), redirect: "follow" });
   if (!res.ok) throw new Error(`downloadArtifact failed (${res.status})`);
   const buf = Buffer.from(await res.arrayBuffer());
   const zip = await JSZip.loadAsync(buf);
-  const file = zip.file(filename);
-  if (!file) return null;
-  return await file.async("string");
+  const available = Object.keys(zip.files).filter((p) => !zip.files[p]?.dir);
+
+  let file = zip.file(filename);
+  if (!file) {
+    const basename = filename.split("/").pop() ?? filename;
+    file = zip.file(basename);
+  }
+  if (!file) {
+    const match = available.find((p) => p.endsWith(filename) || p.endsWith("results.json"));
+    if (match) file = zip.file(match);
+  }
+
+  return {
+    content: file ? await file.async("string") : null,
+    available,
+  };
 }
 
 export async function upsertComment(

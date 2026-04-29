@@ -47,14 +47,24 @@ export async function handleWorkflowRun(event: WorkflowRunEvent, env: Env): Prom
     return;
   }
 
-  const resultsRaw = await downloadArtifactJson(
+  const { content: resultsRaw, available } = await downloadArtifactJson(
     token,
     owner,
     repo,
     artifact.id,
     RESULTS_FILENAME,
   );
-  if (!resultsRaw) return;
+  if (!resultsRaw) {
+    await setCheckRun(
+      token,
+      owner,
+      repo,
+      workflow_run.head_sha,
+      "neutral",
+      `Could not find results.json in the evalcheck-results artifact. Files in zip: ${available.join(", ") || "(none)"}`,
+    );
+    return;
+  }
 
   const current = parseSnapshotFile(resultsRaw);
 
