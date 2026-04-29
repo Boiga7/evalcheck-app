@@ -13,7 +13,7 @@ import type { SnapshotFile } from "./snapshot.js";
 import type { WorkflowRunEvent } from "./webhook.js";
 
 const ARTIFACT_NAME = "evalcheck-results";
-const RESULTS_FILENAME = ".evalcheck/results.json";
+const RESULTS_FILENAME = "results.json";
 const BASELINE_PATH = ".evalcheck/snapshots/baseline.json";
 
 export type Env = {
