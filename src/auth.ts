@@ -1,4 +1,5 @@
-import { SignJWT, importPKCS8 } from "jose";
+import { SignJWT } from "jose";
+import { createPrivateKey } from "node:crypto";
 
 const TEN_MINUTES = 60 * 10;
 
@@ -11,19 +12,7 @@ function normalizePem(pem: string): string {
 
 export async function mintAppJwt(appId: string, privateKeyPem: string): Promise<string> {
   const normalized = normalizePem(privateKeyPem);
-  let key;
-  try {
-    key = await importPKCS8(normalized, "RS256");
-  } catch (err) {
-    throw new Error(
-      `PEM parse failed. raw_len=${privateKeyPem.length} ` +
-        `norm_len=${normalized.length} ` +
-        `lf=${(normalized.match(/\n/g) ?? []).length} ` +
-        `cr=${(normalized.match(/\r/g) ?? []).length} ` +
-        `start="${normalized.slice(0, 30)}" ` +
-        `end="${normalized.slice(-30)}" :: ${String(err)}`,
-    );
-  }
+  const key = createPrivateKey({ key: normalized, format: "pem" });
   const now = Math.floor(Date.now() / 1000);
   return await new SignJWT({})
     .setProtectedHeader({ alg: "RS256" })
