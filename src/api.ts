@@ -184,6 +184,38 @@ export async function upsertComment(
 
 export type CheckConclusion = "success" | "failure" | "neutral";
 
+// Reads the live Marketplace plan attached to an installation. Returns
+// null if the App isn't a paid Marketplace listing yet (the listing is
+// in draft) or if the install was made before the listing went live.
+//
+// Why we re-fetch this instead of caching from marketplace_purchase
+// webhooks: the App is stateless on Vercel — no DB, no KV. Querying
+// per-run adds one HTTP call (~100ms) and avoids needing storage for
+// what is, after all, GitHub's data anyway.
+export type InstallationPlan = {
+  name: string;
+  monthly_price_in_cents: number;
+  is_free: boolean;
+};
+
+export async function getInstallationPlan(
+  token: string,
+  installationId: number,
+): Promise<InstallationPlan | null> {
+  const url = `https://api.github.com/marketplace_listing/installation/${installationId}/plan`;
+  const res = await fetch(url, { headers: headers(token) });
+  // 404 means the App isn't a Marketplace listing yet OR the install
+  // predates the listing. Both are "treat as free tier".
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`getInstallationPlan failed (${res.status}): ${await res.text()}`);
+  const data = (await res.json()) as { name: string; monthly_price_in_cents: number };
+  return {
+    name: data.name,
+    monthly_price_in_cents: data.monthly_price_in_cents,
+    is_free: data.monthly_price_in_cents === 0,
+  };
+}
+
 // Posts a check run keyed to the head SHA. Multiple POSTs to this
 // endpoint create *separate* check runs with the same name — that's
 // unwanted, but it only matters if we end up calling it twice in the

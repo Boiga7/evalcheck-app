@@ -39,8 +39,26 @@ export type WorkflowRunEvent = {
     name: string;
     owner: { login: string };
     default_branch: string;
+    private: boolean;
   };
   installation: { id: number };
+};
+
+// Subset of the marketplace_purchase webhook payload. GitHub fires this
+// when someone purchases / changes / cancels a Marketplace plan for the
+// App. We don't store anything from it locally — instead we query
+// `/marketplace_listing/installations/{installation_id}` per workflow_run
+// to read the live plan. Keeping this stateless avoids needing a DB.
+export type MarketplacePurchaseEvent = {
+  action: "purchased" | "changed" | "pending_change" | "pending_change_cancelled" | "cancelled";
+  effective_date: string;
+  marketplace_purchase: {
+    account: { id: number; login: string; type: "User" | "Organization" };
+    billing_cycle: "monthly" | "yearly";
+    unit_count: number;
+    on_free_trial: boolean;
+    plan: { id: number; name: string; monthly_price_in_cents: number };
+  };
 };
 
 // We only want completed runs — `requested` and `in_progress` fire too

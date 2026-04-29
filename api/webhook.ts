@@ -45,15 +45,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(401).json({ error: "invalid signature" });
   }
 
-  // The App is subscribed to workflow_run events specifically, but GitHub
-  // also delivers `installation.created` and `ping` events whether you
-  // ask for them or not. Acknowledge those quickly without doing work.
   const event = req.headers["x-github-event"] as string | undefined;
+  const payload = JSON.parse(rawBody);
+
+  // Marketplace events fire when someone purchases / changes / cancels
+  // a paid plan. Currently no-op: we re-query the plan per workflow_run
+  // via the API instead of mirroring it locally. Acknowledging here keeps
+  // GitHub's delivery success rate green and reserves the path for when
+  // we want richer onboarding (welcome email, analytics, etc).
+  if (event === "marketplace_purchase") {
+    console.log("marketplace_purchase received", { action: payload.action });
+    return res.status(200).json({ ok: true, marketplace: true });
+  }
+
+  // The App is subscribed to workflow_run, ping, and installation events.
+  // workflow_run is the only one we actually do work for; the others are
+  // logistical and just need a 200 ack.
   if (event !== "workflow_run") {
     return res.status(200).json({ ignored: true, reason: `event=${event ?? "<missing>"}` });
   }
 
-  const payload = JSON.parse(rawBody);
   // Only act on completed runs — `requested` and `in_progress` fire too
   // and we have nothing useful to do with them.
   if (!isWorkflowRunCompleted(payload)) {

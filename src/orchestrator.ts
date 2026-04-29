@@ -6,6 +6,7 @@ import { getInstallationToken } from "./auth.js";
 import {
   downloadArtifactJson,
   findArtifact,
+  getInstallationPlan,
   getRepoFile,
   listPullsForCommit,
   setCheckRun,
@@ -29,6 +30,15 @@ const RESULTS_FILENAME = ".evalcheck/results.json";
 // not the head — we want to know "did this PR move the score relative to
 // what's on main", not "what does the score look like in this PR's tree".
 const BASELINE_PATH = ".evalcheck/snapshots/baseline.json";
+
+// Free-tier cap on a single workflow run. Above this on a private repo,
+// we ask the user to upgrade to Pro on the Marketplace listing. Public
+// repos are uncapped — they're the loss leader for distribution.
+//
+// Currently OFF by default — flipping ENABLE_BILLING_GATE=true on Vercel
+// turns enforcement on. Until we have ~50 free-tier installs the gate
+// is just noise; gating zero customers achieves nothing.
+const FREE_TIER_EVAL_CAP = 50;
 
 export type Env = {
   appId: string;
@@ -91,6 +101,25 @@ export async function handleWorkflowRun(event: WorkflowRunEvent, env: Env): Prom
   }
 
   const current = parseSnapshotFile(resultsRaw);
+
+  // Marketplace-tier check. Currently log-only; flip ENABLE_BILLING_GATE
+  // when we have customers to start enforcing. The plan API is queried
+  // lazily — only on private repos, and only once per orchestrator pass.
+  if (repository.private && process.env.ENABLE_BILLING_GATE === "true") {
+    const plan = await getInstallationPlan(token, installation.id);
+    const overFreeCap = current.runs.length > FREE_TIER_EVAL_CAP;
+    if ((!plan || plan.is_free) && overFreeCap) {
+      await setCheckRun(
+        token,
+        repository.owner.login,
+        repository.name,
+        workflow_run.head_sha,
+        "neutral",
+        `evalcheck Free tier covers up to ${FREE_TIER_EVAL_CAP} evals per run. This run had ${current.runs.length}. Upgrade at https://github.com/marketplace/evalcheck to remove the cap.`,
+      );
+      return;
+    }
+  }
 
   // One PR almost always; multiple is rare but possible if a SHA is the
   // head of two open PRs. Comment on each.
