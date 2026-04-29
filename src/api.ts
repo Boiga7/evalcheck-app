@@ -34,6 +34,37 @@ export async function getRepoFile(
   return Buffer.from(data.content, "base64").toString("utf-8");
 }
 
+export type PullRequestRef = {
+  number: number;
+  base: { ref: string };
+  head: { ref: string };
+};
+
+export async function listPullsForCommit(
+  token: string,
+  owner: string,
+  repo: string,
+  sha: string,
+): Promise<PullRequestRef[]> {
+  const url = `https://api.github.com/repos/${owner}/${repo}/commits/${sha}/pulls`;
+  const res = await fetch(url, {
+    headers: {
+      ...headers(token),
+      Accept: "application/vnd.github.groot-preview+json",
+    },
+  });
+  if (!res.ok) throw new Error(`listPullsForCommit failed (${res.status}): ${await res.text()}`);
+  const pulls = (await res.json()) as Array<{
+    number: number;
+    base: { ref: string };
+    head: { ref: string };
+    state: string;
+  }>;
+  return pulls
+    .filter((p) => p.state === "open")
+    .map((p) => ({ number: p.number, base: { ref: p.base.ref }, head: { ref: p.head.ref } }));
+}
+
 type Artifact = { id: number; name: string; expired: boolean };
 
 export async function findArtifact(

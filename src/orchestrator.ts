@@ -3,6 +3,7 @@ import {
   downloadArtifactJson,
   findArtifact,
   getRepoFile,
+  listPullsForCommit,
   setCheckRun,
   upsertComment,
 } from "./api.js";
@@ -25,12 +26,26 @@ export async function handleWorkflowRun(event: WorkflowRunEvent, env: Env): Prom
   const owner = repository.owner.login;
   const repo = repository.name;
 
-  if (workflow_run.pull_requests.length === 0) return;
-
   const token = await getInstallationToken(env.appId, env.privateKey, installation.id);
 
+  let pullRequests = workflow_run.pull_requests;
+  if (pullRequests.length === 0) {
+    pullRequests = await listPullsForCommit(token, owner, repo, workflow_run.head_sha);
+  }
+  if (pullRequests.length === 0) return;
+
   const artifact = await findArtifact(token, owner, repo, workflow_run.id, ARTIFACT_NAME);
-  if (!artifact) return;
+  if (!artifact) {
+    await setCheckRun(
+      token,
+      owner,
+      repo,
+      workflow_run.head_sha,
+      "neutral",
+      "no `evalcheck-results` artifact found on this run",
+    );
+    return;
+  }
 
   const resultsRaw = await downloadArtifactJson(
     token,
@@ -43,7 +58,7 @@ export async function handleWorkflowRun(event: WorkflowRunEvent, env: Env): Prom
 
   const current = parseSnapshotFile(resultsRaw);
 
-  for (const pr of workflow_run.pull_requests) {
+  for (const pr of pullRequests) {
     const baselineRaw = await getRepoFile(token, owner, repo, BASELINE_PATH, pr.base.ref);
     const baseline: SnapshotFile = baselineRaw
       ? parseSnapshotFile(baselineRaw)
